@@ -20,6 +20,9 @@ import Mathlib.Analysis.Normed.Operator.ContinuousLinearMap
 import Mathlib.Analysis.Complex.Order
 import Mathlib.Analysis.Normed.Algebra.Spectrum
 import Mathlib.Order.Basic
+import Mathlib.LinearAlgebra.Charpoly.Basic
+import Mathlib.LinearAlgebra.Matrix.Charpoly.LinearMap
+
 
 --set_option diagnostics true
 open scoped ComplexOrder
@@ -284,11 +287,105 @@ theorem controllabilityColumnSpace_mono (a : σ →L[ℂ] σ) (B : ι →L[ℂ] 
   obtain ⟨i, v, rfl⟩ := hx
   exact ⟨⟨i.val, Nat.lt_of_lt_of_le i.isLt h⟩, v, rfl⟩
 
-theorem cayley_hamilton_controllolability
-    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0) :
+
+
+
+lemma controllabilityColumnSpace_invariant [FiniteDimensional ℂ σ]
+    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
+    Submodule.map a.toLinearMap (controllabilityColumnSpace a B n) ≤
+    controllabilityColumnSpace a B n := by
+  -- Suffices to show generators map into the submodule
+  rw [Submodule.map_le_iff_le_comap]
+  rw [controllabilityColumnSpace]
+  rw [Submodule.span_le]
+  intro x hx
+  simp only [Set.mem_iUnion, Set.mem_range] at hx
+  obtain ⟨i, v, rfl⟩ := hx
+  -- Need to show a((a^i)(B v)) ∈ controllabilityColumnSpace a B n
+  rw [Submodule.mem_comap]
+  simp only [ContinuousLinearMap.coe_coe]
+  -- a((a^i)(B v)) = (a^(i+1))(B v)
+  have h_pow : a.toLinearMap ((a ^ i.val) (B v)) = (a ^ (i.val + 1)) (B v) := by
+    rw [← ContinuousLinearMap.comp_apply]
+    congr 1
+    exact (system_power_multiplication_flopped a i.val).symm
+  rw [h_pow]
+  -- Case split: i+1 < n or i+1 = n
+  by_cases h : i.val + 1 < n
+  · -- i+1 < n: direct generator
+    apply Submodule.subset_span
+    simp only [Set.mem_iUnion, Set.mem_range]
+    exact ⟨⟨i.val + 1, h⟩, v, rfl⟩
+  · -- i+1 ≥ n, so i+1 = n (since i < n)
+    have h_eq : i.val + 1 = n := by
+      have := i.isLt
+      omega
+    rw [h_eq]
+
+    let f := a.toLinearMap
+    have h_ch : Polynomial.aeval f f.charpoly = 0 := LinearMap.aeval_self_charpoly f
+    have h_deg : f.charpoly.natDegree = n := by
+      rw [LinearMap.charpoly_natDegree_eq_finrank, h_dim]
+    have h_monic : f.charpoly.Monic := LinearMap.charpoly_monic f
+
+    have h_pow_n : (a ^ n) (B v) =
+        -∑ j in Finset.range n, (f.charpoly.coeff j) • ((a ^ j) (B v)) := by
+      have := h_ch
+      rw [Polynomial.aeval_eq_sum_range' (by omega : n + 1 ≤ f.charpoly.natDegree + 1)] at this
+      simp only [Polynomial.aeval_def, Polynomial.eval₂_eq_sum_range] at this
+      -- Extract the relation from aeval = 0
+      have h_leading : f.charpoly.coeff n = 1 := by
+        rw [← h_deg]
+        exact h_monic
+        sorry
+    rw [h_pow_n]
+    -- Negation and sum preserve membership in submodule
+    apply Submodule.neg_mem
+    apply Submodule.sum_mem
+    intro j hj
+    apply Submodule.smul_mem
+    -- (a^j)(B v) with j < n is in the span
+    apply Submodule.subset_span
+    simp only [Set.mem_iUnion, Set.mem_range]
+    exact ⟨⟨j, Finset.mem_range.mp hj⟩, v, rfl⟩
+
+theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
+    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
+    (h_dim : Module.finrank ℂ σ = n) :
     ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n := by
-    intro j h_gthan_n v
-    sorry
+  intro j hj v
+  induction j using Nat.strong_induction_on with
+  | _ j ih =>
+    by_cases hjn : j < n
+    · -- j < n case: directly in the span
+      unfold controllabilityColumnSpace
+      apply Submodule.subset_span
+      simp only [Set.mem_iUnion, Set.mem_range]
+      exact ⟨⟨j, hjn⟩, v, rfl⟩
+    · -- j ≥ n: use invariance and induction
+      push_neg at hjn
+      by_cases hj_zero : j = 0
+      · -- Edge case: j = 0 but j ≥ n means n = 0, contradiction with hn
+        omega
+      · -- j > 0 and j ≥ n
+        have hj_pos : j > 0 := Nat.pos_of_ne_zero hj_zero
+        have : j = (j - 1) + 1 := sorry
+        rw [this, pow_succ', ContinuousLinearMap.mul_apply]
+        apply controllabilityColumnSpace_invariant a B n h_dim
+        apply Submodule.mem_map_of_mem
+        have h_pred_ge : j - 1 ≥ n ∨ j - 1 < n := sorry
+        cases h_pred_ge with
+        | inl h_ge =>
+          apply ih
+
+          omega
+          exact h_ge
+        | inr h_lt =>
+          -- j - 1 < n case
+          unfold controllabilityColumnSpace
+          apply Submodule.subset_span
+          simp only [Set.mem_iUnion, Set.mem_range]
+          exact ⟨⟨j - 1, h_lt⟩, v, rfl⟩
 
 
 
