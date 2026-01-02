@@ -22,6 +22,8 @@ import Mathlib.Analysis.Normed.Algebra.Spectrum
 import Mathlib.Order.Basic
 import Mathlib.LinearAlgebra.Charpoly.Basic
 import Mathlib.LinearAlgebra.Matrix.Charpoly.LinearMap
+import Cslib.CPS.Cayley
+
 
 
 --set_option diagnostics true
@@ -66,34 +68,6 @@ def state_system_equation (sys : DiscreteLinearSystemState σ ι) : Prop :=
 -- Zero input sequence
 def zero_input : ℕ → ι := fun _ => 0
 
--- Power multiplication for continuous linear maps
-lemma system_power_multiplication (a : σ →L[ℂ] σ) (k : ℕ) :
-    a ^ (k + 1) = (a ^ k).comp a := by
-  induction k with
-  | zero =>
-    simp [pow_zero]
-    exact ContinuousLinearMap.id_comp a
-
-  | succ k ih =>
-    rw [pow_succ]
-    rw [ih]
-    rfl
-
-lemma system_power_multiplication_flopped (a : σ →L[ℂ] σ) (k : ℕ) :
-    a ^ (k + 1) = a.comp (a^k) := by
-  induction k with
-  | zero =>
-    simp [pow_zero]
-    exact ContinuousLinearMap.id_comp a
-
-  | succ k ih =>
-    rw [pow_succ]
-    rw [ih]
-
-    simp only [←ContinuousLinearMap.mul_def]
-    rw [mul_assoc]
-
-    congr 1
 
 
 
@@ -290,64 +264,7 @@ theorem controllabilityColumnSpace_mono (a : σ →L[ℂ] σ) (B : ι →L[ℂ] 
 
 
 
-lemma controllabilityColumnSpace_invariant [FiniteDimensional ℂ σ]
-    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
-    Submodule.map a.toLinearMap (controllabilityColumnSpace a B n) ≤
-    controllabilityColumnSpace a B n := by
-  -- Suffices to show generators map into the submodule
-  rw [Submodule.map_le_iff_le_comap]
-  rw [controllabilityColumnSpace]
-  rw [Submodule.span_le]
-  intro x hx
-  simp only [Set.mem_iUnion, Set.mem_range] at hx
-  obtain ⟨i, v, rfl⟩ := hx
-  -- Need to show a((a^i)(B v)) ∈ controllabilityColumnSpace a B n
-  rw [Submodule.mem_comap]
-  simp only [ContinuousLinearMap.coe_coe]
-  -- a((a^i)(B v)) = (a^(i+1))(B v)
-  have h_pow : a.toLinearMap ((a ^ i.val) (B v)) = (a ^ (i.val + 1)) (B v) := by
-    rw [← ContinuousLinearMap.comp_apply]
-    congr 1
-    exact (system_power_multiplication_flopped a i.val).symm
-  rw [h_pow]
-  -- Case split: i+1 < n or i+1 = n
-  by_cases h : i.val + 1 < n
-  · -- i+1 < n: direct generator
-    apply Submodule.subset_span
-    simp only [Set.mem_iUnion, Set.mem_range]
-    exact ⟨⟨i.val + 1, h⟩, v, rfl⟩
-  · -- i+1 ≥ n, so i+1 = n (since i < n)
-    have h_eq : i.val + 1 = n := by
-      have := i.isLt
-      omega
-    rw [h_eq]
 
-    let f := a.toLinearMap
-    have h_ch : Polynomial.aeval f f.charpoly = 0 := LinearMap.aeval_self_charpoly f
-    have h_deg : f.charpoly.natDegree = n := by
-      rw [LinearMap.charpoly_natDegree_eq_finrank, h_dim]
-    have h_monic : f.charpoly.Monic := LinearMap.charpoly_monic f
-
-    have h_pow_n : (a ^ n) (B v) =
-        -∑ j in Finset.range n, (f.charpoly.coeff j) • ((a ^ j) (B v)) := by
-      have := h_ch
-      rw [Polynomial.aeval_eq_sum_range' (by omega : n + 1 ≤ f.charpoly.natDegree + 1)] at this
-      simp only [Polynomial.aeval_def, Polynomial.eval₂_eq_sum_range] at this
-      -- Extract the relation from aeval = 0
-      have h_leading : f.charpoly.coeff n = 1 := by
-        rw [← h_deg]
-        exact h_monic
-        sorry
-    rw [h_pow_n]
-    -- Negation and sum preserve membership in submodule
-    apply Submodule.neg_mem
-    apply Submodule.sum_mem
-    intro j hj
-    apply Submodule.smul_mem
-    -- (a^j)(B v) with j < n is in the span
-    apply Submodule.subset_span
-    simp only [Set.mem_iUnion, Set.mem_range]
-    exact ⟨⟨j, Finset.mem_range.mp hj⟩, v, rfl⟩
 
 theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
@@ -369,20 +286,26 @@ theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
         omega
       · -- j > 0 and j ≥ n
         have hj_pos : j > 0 := Nat.pos_of_ne_zero hj_zero
-        have : j = (j - 1) + 1 := sorry
+        have : j = (j - 1) + 1 := by
+          omega
+
         rw [this, pow_succ', ContinuousLinearMap.mul_apply]
         apply controllabilityColumnSpace_invariant a B n h_dim
         apply Submodule.mem_map_of_mem
-        have h_pred_ge : j - 1 ≥ n ∨ j - 1 < n := sorry
+        have h_pred_ge : j - 1 ≥ n ∨ j - 1 < n := by
+          by_cases h : j - 1 ≥ n
+          · left; exact h
+          · right; push_neg at h; exact h
+
+
         cases h_pred_ge with
         | inl h_ge =>
           apply ih
-
           omega
           exact h_ge
         | inr h_lt =>
           -- j - 1 < n case
-          unfold controllabilityColumnSpace
+          -- unfold controllabilityColumnSpace
           apply Submodule.subset_span
           simp only [Set.mem_iUnion, Set.mem_range]
           exact ⟨⟨j - 1, h_lt⟩, v, rfl⟩
@@ -392,9 +315,9 @@ theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
 
 
 theorem controllabilityColumnSpace_stabilizes
+    [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
-    -- Stronger Cayley-Hamilton hypothesis
-    (hCH : ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n) :
+    (h_dim : Module.finrank ℂ σ = n) :
     ∀ k ≥ n, controllabilityColumnSpace a B k = controllabilityColumnSpace a B n := by
   intro k hk
   apply le_antisymm
@@ -422,22 +345,15 @@ theorem controllabilityColumnSpace_stabilizes
         -- hd : i.val = n + 0, i.e., i.val = n
         simp only [Nat.add_zero] at hd
         rw [hd]
-        apply hCH
+        apply cayley_hamilton_controllability' a B n hn h_dim
         trivial
 
 
       | succ m ih =>
         have h_ge : n + (m + 1) ≥ n := Nat.le_add_right n (m + 1)
-        apply hCH
+        apply cayley_hamilton_controllability' a B n hn h_dim
         rw [hd]
         trivial
-
-
-
-
-
-
-
   .
     apply controllabilityColumnSpace_mono
     trivial
@@ -463,8 +379,9 @@ theorem reachable_implies_total_reachable_eq_univ (a : σ →L[ℂ] σ) (B : ι 
 
 /-- The total reachable set equals the controllability column space at any sufficiently large k -/
 theorem totalReachableSubmodule_eq_controllabilityColumnSpace
+    [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
-    (hCH : ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n) :
+    (h_dim : Module.finrank ℂ σ = n) :
     totalReachableSubmodule a B = controllabilityColumnSpace a B n := by
   apply le_antisymm
   · -- Show ⨆ k, C_k ≤ C_n
@@ -473,17 +390,18 @@ theorem totalReachableSubmodule_eq_controllabilityColumnSpace
     by_cases hk : k ≤ n
     · exact controllabilityColumnSpace_mono a B hk
     · push_neg at hk
-      rw [controllabilityColumnSpace_stabilizes a B n hn hCH k (le_of_lt hk)]
+      rw [controllabilityColumnSpace_stabilizes a B n hn h_dim k (le_of_lt hk)]
   · -- Show C_n ≤ ⨆ k, C_k
     exact le_iSup (controllabilityColumnSpace a B) n
 
 /-- Step 3b: Complete reachability implies the controllability column space equals the entire space -/
 theorem reachable_implies_controllabilityColumnSpace_eq_top
+    [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
-    (hCH : ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n)
+    (h_dim : Module.finrank ℂ σ = n)
     (h_reach : IsReachable a B) :
     controllabilityColumnSpace a B n = ⊤ := by
-  rw [← totalReachableSubmodule_eq_controllabilityColumnSpace a B n hn hCH]
+  rw [← totalReachableSubmodule_eq_controllabilityColumnSpace a B n hn h_dim]
   rw [eq_top_iff]
   intro x _
   -- x is reachable by h_reach
@@ -503,11 +421,12 @@ In the infinite-dimensional setting, "full rank" means the controllability colum
 equals the entire state space (i.e., is the top submodule).
 -/
 theorem reachability_implies_full_rank
+    [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
-    (hCH : ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n)
+    (h_dim : Module.finrank ℂ σ = n)
     (h_reach : IsReachable a B) :
     controllabilityColumnSpace a B n = ⊤ :=
-  reachable_implies_controllabilityColumnSpace_eq_top a B n hn hCH h_reach
+  reachable_implies_controllabilityColumnSpace_eq_top a B n hn h_dim h_reach
 
 
 /-- Step 4 (finite-dimensional version): Complete reachability implies rank(C) = n
@@ -516,13 +435,11 @@ theorem reachability_implies_full_rank
 theorem reachability_implies_rank_eq_dim
     [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ)
-    (hCH : ∀ j ≥ Module.finrank ℂ σ, ∀ v : ι,
-           (a ^ j) (B v) ∈ controllabilityColumnSpace a B (Module.finrank ℂ σ))
     (h_reach : IsReachable a B)
     (hn : Module.finrank ℂ σ > 0) :
     Module.finrank ℂ (controllabilityColumnSpace a B (Module.finrank ℂ σ)) =
     Module.finrank ℂ σ := by
-  have h_top := reachability_implies_full_rank a B (Module.finrank ℂ σ) hn hCH h_reach
+  have h_top := reachability_implies_full_rank a B (Module.finrank ℂ σ) hn rfl h_reach
   rw [h_top]
   exact finrank_top ℂ σ
 
@@ -532,10 +449,9 @@ theorem reachability_implies_full_finrank
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ)
     (h_dim : Module.finrank ℂ σ = n)
     (hn : n > 0)
-    (hCH : ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ controllabilityColumnSpace a B n)
     (h_reach : IsReachable a B) :
     Module.finrank ℂ (controllabilityColumnSpace a B n) = n := by
-  have h_top := reachability_implies_full_rank a B n hn hCH h_reach
+  have h_top := reachability_implies_full_rank a B n hn h_dim h_reach
   rw [h_top]
   rw [finrank_top]
   exact h_dim

@@ -42,20 +42,6 @@ variable [TopologicalSpace σ] [NormedAddCommGroup σ] [NormedSpace ℂ σ]
 variable [TopologicalSpace ι] [NormedAddCommGroup ι] [NormedSpace ℂ ι]
 variable [Inhabited ι]
 
-variable (σ ι) in
-structure DiscreteLinearSystemState where
-  /-- State transition matrix (n×n) -/
-  a : σ →L[ℂ] σ
-  /-- Input matrix (n×p) -/
-  B : ι →L[ℂ] σ
-  /-- Initial state -/
-  x₀ : σ
-  /-- State sequence -/
-  x : ℕ → σ
-  /-- Input sequence -/
-  u : ℕ → ι
-
-
 
 -- Power multiplication for continuous linear maps
 lemma system_power_multiplication (a : σ →L[ℂ] σ) (k : ℕ) :
@@ -87,18 +73,6 @@ lemma system_power_multiplication_flopped (a : σ →L[ℂ] σ) (k : ℕ) :
     congr 1
 
 
-def controllabilityColumnSpace (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (k : ℕ) : Submodule ℂ σ :=
-  Submodule.span ℂ (⋃ i : Fin k, Set.range (fun v => (a ^ i.val) (B v)))
-
-/--
-lemma controllabilityColumnSpace_invariant [FiniteDimensional ℂ σ]
-    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
-    Submodule.map a.toLinearMap (controllabilityColumnSpace a B n) ≤
-    controllabilityColumnSpace a B n := by
-
-    sorry
-
--/
 
 lemma helper1 [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (i : Fin n) (v : ι) :
@@ -109,13 +83,13 @@ lemma helper1 [FiniteDimensional ℂ σ]
     simp
 
 lemma helper2 [FiniteDimensional ℂ σ]
-    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
+    (a : σ →L[ℂ] σ)  (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
     a.toLinearMap.charpoly.natDegree = n := by
   rw [← h_dim]
   exact LinearMap.charpoly_natDegree a.toLinearMap
 
 lemma helper3 [FiniteDimensional ℂ σ]
-    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
+    (a : σ →L[ℂ] σ)  (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
     ∃ (c : Fin n → ℂ), a.toLinearMap ^ n = ∑ j : Fin n, c j • (a.toLinearMap ^ j.val) := by
 
   let p := a.toLinearMap.charpoly
@@ -142,13 +116,14 @@ lemma helper3 [FiniteDimensional ℂ σ]
   exact eq_neg_of_add_eq_zero_left ch
 
 
-lemma controllabilityColumnSpace_invariant2 [FiniteDimensional ℂ σ]
+lemma controllabilityColumnSpace_invariant [FiniteDimensional ℂ σ]
     (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (h_dim : Module.finrank ℂ σ = n) :
-    Submodule.map a.toLinearMap (controllabilityColumnSpace a B n) ≤
-    controllabilityColumnSpace a B n := by
+    Submodule.map a.toLinearMap
+    (Submodule.span ℂ (⋃ i : Fin n, Set.range (fun v => (a ^ i.val) (B v)))) ≤
+    Submodule.span ℂ (⋃ i : Fin n, Set.range (fun v => (a ^ i.val) (B v))):= by
 
   -- Unfold the definition of controllabilityColumnSpace
-  unfold controllabilityColumnSpace
+  -- unfold controllabilityColumnSpace
 
   -- It suffices to show that a maps generators to the submodule
   rw [Submodule.map_span_le]
@@ -185,7 +160,7 @@ lemma controllabilityColumnSpace_invariant2 [FiniteDimensional ℂ σ]
 
     -- The characteristic polynomial has degree n
     have deg_ch : a.toLinearMap.charpoly.natDegree = n := by
-      apply helper2 a B n h_dim
+      apply helper2 a  n h_dim
 
     -- Since i.val < n and i.val + 1 ≥ n, we have i.val = n - 1
     have i_eq : i.val = n - 1 := by
@@ -199,7 +174,7 @@ lemma controllabilityColumnSpace_invariant2 [FiniteDimensional ℂ σ]
     have : ∃ (c : Fin n → ℂ), a.toLinearMap ^ n = ∑ j : Fin n, c j • (a.toLinearMap ^ j.val) := by
       -- This follows from Cayley-Hamilton but requires some work to extract
       -- For now, we'll use sorry here as the full extraction is technical
-      apply helper3 a B n h_dim
+      apply helper3 a  n h_dim
 
     obtain ⟨c, hc⟩ := this
 
@@ -228,14 +203,16 @@ lemma controllabilityColumnSpace_invariant2 [FiniteDimensional ℂ σ]
       conv_rhs => rw [hn, pow_succ']
       rfl
 
-    rw [this]
+    rw [this, h_apply]
 
     -- The sum is in the span since each term is
-    simp only [Submodule.sum_mem]
-    intro j _
-    apply Submodule.smul_mem
-    apply Submodule.subset_span
-    simp only [Set.mem_iUnion]
-    use j
-    simp only [Set.mem_range]
-    use v
+    apply Finset.sum_induction _ (· ∈ Submodule.span ℂ _)
+    · exact fun _ _ => Submodule.add_mem _
+    · exact Submodule.zero_mem _
+    · intro j _
+      apply Submodule.smul_mem
+      apply Submodule.subset_span
+      simp only [Set.mem_iUnion]
+      use j
+      simp only [Set.mem_range]
+      use v
