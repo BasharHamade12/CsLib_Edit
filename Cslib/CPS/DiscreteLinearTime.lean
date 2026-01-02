@@ -57,12 +57,13 @@ structure DiscreteLinearSystemState where
   u : ℕ → ι
 
 -- System evolution function
-noncomputable def system_evolution (sys : DiscreteLinearSystemState σ ι) : ℕ → σ
+noncomputable def DiscreteLinearSystemState.system_evolution
+(sys : DiscreteLinearSystemState σ ι) : ℕ → σ
   | 0 => sys.x₀
   | k + 1 => sys.a (system_evolution sys k) + sys.B (sys.u k)
 
 -- Discrete State space representatio
-def state_system_equation (sys : DiscreteLinearSystemState σ ι) : Prop :=
+def DiscreteLinearSystemState.state_system_equation (sys : DiscreteLinearSystemState σ ι) : Prop :=
   ∀ k : ℕ, sys.x (k + 1) = sys.a (sys.x k) + sys.B (sys.u k)
 
 -- Zero input sequence
