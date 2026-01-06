@@ -192,6 +192,7 @@ theorem reachable_set_eq_controllability_range (a : σ →L[ℂ] σ) (B : ι →
   constructor
   · intro h_reach
     obtain ⟨u, h_reach⟩ := h_reach
+
     rw [evolution_eq_matrix_form] at h_reach
     rw [← h_reach]
     apply Submodule.sum_mem
@@ -280,6 +281,7 @@ theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
       apply Submodule.subset_span
       simp only [Set.mem_iUnion, Set.mem_range]
       exact ⟨⟨j, hjn⟩, v, rfl⟩
+
     · -- j ≥ n: use invariance and induction
       push_neg at hjn
       by_cases hj_zero : j = 0

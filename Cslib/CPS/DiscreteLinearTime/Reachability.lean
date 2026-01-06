@@ -12,5 +12,13 @@ variable {sys : DiscreteLinearSystemState σ ι}
     and an input sequence U = (u[0], u[1], ..., u[k_f-1]) such that starting from
     x[0] = 0, the system reaches x[k_f] = x_f -/
 def DiscreteLinearSystemState.IsReachable : Prop :=
-  ∀ x_f : σ, ∃ (k_f : ℕ) , k_f > 0 ∧
-  DiscreteLinearSystemState.evolve_from_zero sys k_f = x_f
+  ∀ x_f : σ, ∃ (k_f : ℕ) (u : ℕ → ι) , k_f > 0 ∧
+  DiscreteLinearSystemState.evolve_from_zero u sys k_f = x_f
+
+/-- The set of states reachable in exactly k steps -/
+def DiscreteLinearSystemState.reachableSetInKSteps (sys : DiscreteLinearSystemState σ ι) (k : ℕ) : Set σ :=
+  {x : σ | ∃ u : ℕ → ι, DiscreteLinearSystemState.evolve_from_zero u sys k = x}
+
+
+def DiscreteLinearSystemState.totalReachableSet  (sys : DiscreteLinearSystemState σ ι) : Set σ :=
+  ⋃ k : ℕ, reachableSetInKSteps sys k

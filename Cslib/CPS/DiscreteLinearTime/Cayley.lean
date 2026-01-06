@@ -25,6 +25,7 @@ import Mathlib.LinearAlgebra.Matrix.Charpoly.LinearMap
 import Mathlib.Algebra.Algebra.Bilinear
 
 
+
 --set_option diagnostics true
 open scoped ComplexOrder
 
@@ -216,3 +217,50 @@ lemma controllabilityColumnSpace_invariant [FiniteDimensional ℂ σ]
       use j
       simp only [Set.mem_range]
       use v
+
+theorem cayley_hamilton_controllability' [FiniteDimensional ℂ σ]
+    (a : σ →L[ℂ] σ) (B : ι →L[ℂ] σ) (n : ℕ) (hn : n > 0)
+    (h_dim : Module.finrank ℂ σ = n) :
+    ∀ j ≥ n, ∀ v : ι, (a ^ j) (B v) ∈ Submodule.span ℂ (⋃ i : Fin n, Set.range (fun v => (a ^ i.val) (B v))) := by
+  intro j hj v
+  induction j using Nat.strong_induction_on with
+  | _ j ih =>
+    by_cases hjn : j < n
+    · -- j < n case: directly in the span
+
+      apply Submodule.subset_span
+      simp only [Set.mem_iUnion, Set.mem_range]
+
+
+      exact ⟨⟨j, hjn⟩, v, rfl⟩
+
+    · -- j ≥ n: use invariance and induction
+      push_neg at hjn
+      by_cases hj_zero : j = 0
+      · -- Edge case: j = 0 but j ≥ n means n = 0, contradiction with hn
+        omega
+      · -- j > 0 and j ≥ n
+        have hj_pos : j > 0 := Nat.pos_of_ne_zero hj_zero
+        have : j = (j - 1) + 1 := by
+          omega
+
+        rw [this, pow_succ', ContinuousLinearMap.mul_apply]
+        apply controllabilityColumnSpace_invariant a B n h_dim
+        apply Submodule.mem_map_of_mem
+        have h_pred_ge : j - 1 ≥ n ∨ j - 1 < n := by
+          by_cases h : j - 1 ≥ n
+          · left; exact h
+          · right; push_neg at h; exact h
+
+
+        cases h_pred_ge with
+        | inl h_ge =>
+          apply ih
+          omega
+          exact h_ge
+        | inr h_lt =>
+          -- j - 1 < n case
+          -- unfold controllabilityColumnSpace
+          apply Submodule.subset_span
+          simp only [Set.mem_iUnion, Set.mem_range]
+          exact ⟨⟨j - 1, h_lt⟩, v, rfl⟩

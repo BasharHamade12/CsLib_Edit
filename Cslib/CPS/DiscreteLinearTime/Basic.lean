@@ -51,9 +51,9 @@ structure DiscreteLinearSystemState (σ : Type u) (ι : Type v)
 variable {sys : DiscreteLinearSystemState σ ι}
 
 /-- System evolution function from initial state -/
-noncomputable def DiscreteLinearSystemState.system_evolution : ℕ → σ
+noncomputable def DiscreteLinearSystemState.system_evolution (u : ℕ → ι) : ℕ → σ
   | 0 => sys.x₀
-  | k + 1 => sys.a (system_evolution k) + sys.B (sys.u k)
+  | k + 1 => sys.a (system_evolution u k) + sys.B (u k)
 
 /-- Discrete state space representation property -/
 def DiscreteLinearSystemState.satisfies_state_equation : Prop :=
@@ -62,9 +62,9 @@ def DiscreteLinearSystemState.satisfies_state_equation : Prop :=
 
 /-- Evolution from zero initial state with given input -/
 noncomputable def DiscreteLinearSystemState.evolve_from_zero
-    (sys : DiscreteLinearSystemState σ ι) : ℕ → σ
+   (u : ℕ → ι) (sys : DiscreteLinearSystemState σ ι) : ℕ → σ
   | 0 => 0
-  | k + 1 => sys.a (sys.evolve_from_zero (k)) + sys.B (sys.u k)
+  | k + 1 => sys.a (evolve_from_zero u sys k) + sys.B (u k)
 
 
 
