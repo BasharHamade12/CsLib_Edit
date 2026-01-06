@@ -15,7 +15,7 @@ import Mathlib.Analysis.Normed.Algebra.Spectrum
 import Mathlib.Order.Basic
 import Mathlib.LinearAlgebra.Charpoly.Basic
 import Mathlib.LinearAlgebra.Matrix.Charpoly.LinearMap
-import Cslib.CPS.Cayley
+
 
 open scoped ComplexOrder
 

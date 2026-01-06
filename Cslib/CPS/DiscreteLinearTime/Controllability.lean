@@ -177,15 +177,100 @@ theorem controllabilityColumnSpace_stabilizes
         -- hd : i.val = n + 0, i.e., i.val = n
         simp only [Nat.add_zero] at hd
         rw [hd]
-        apply cayley_hamilton_controllability' a B n hn h_dim
+        apply cayley_hamilton_controllability' s.a s.B n hn h_dim
         trivial
 
 
       | succ m ih =>
         have h_ge : n + (m + 1) ≥ n := Nat.le_add_right n (m + 1)
-        apply cayley_hamilton_controllability' a B n hn h_dim
+
+        apply cayley_hamilton_controllability' s.a s.B n hn h_dim
         rw [hd]
         trivial
   .
     apply controllabilityColumnSpace_mono
     trivial
+
+
+def totalReachableSubmodule  (sys : DiscreteLinearSystemState σ ι) : Submodule ℂ σ :=
+  ⨆ k : ℕ, controllabilityColumnSpace sys.a sys.B k
+
+
+theorem reachable_implies_total_reachable_eq_univ
+    (sys : DiscreteLinearSystemState σ ι)
+    (h_reach : sys.IsReachable) : totalReachableSet sys = Set.univ := by
+  ext x
+  simp only [totalReachableSet, Set.mem_iUnion]
+  simp only [Set.mem_univ, iff_true]
+  -- By definition of IsReachable, for any x there exists k and u such that we reach x
+  obtain ⟨k, u, hk_pos, hx⟩ := h_reach x
+  exact ⟨k, u, hx⟩
+
+
+theorem totalReachableSubmodule_eq_controllabilityColumnSpace
+    [FiniteDimensional ℂ σ]
+    (sys : DiscreteLinearSystemState σ ι) (n : ℕ) (hn : n > 0)
+    (h_dim : Module.finrank ℂ σ = n) :
+    totalReachableSubmodule sys = controllabilityColumnSpace sys.a sys.B n := by
+  apply le_antisymm
+  · -- Show ⨆ k, C_k ≤ C_n
+    apply iSup_le
+    intro k
+    by_cases hk : k ≤ n
+    · exact controllabilityColumnSpace_mono sys hk
+    · push_neg at hk
+      rw [controllabilityColumnSpace_stabilizes sys n hn h_dim k (le_of_lt hk)]
+  · -- Show C_n ≤ ⨆ k, C_k
+    exact le_iSup (controllabilityColumnSpace sys.a sys.B) n
+
+theorem reachable_implies_controllabilityColumnSpace_eq_top
+    [FiniteDimensional ℂ σ]
+    (sys : DiscreteLinearSystemState σ ι) (n : ℕ) (hn : n > 0)
+    (h_dim : Module.finrank ℂ σ = n)
+    (h_reach : sys.IsReachable) :
+    controllabilityColumnSpace sys.a sys.B n = ⊤ := by
+  rw [← totalReachableSubmodule_eq_controllabilityColumnSpace sys n hn h_dim]
+  rw [eq_top_iff]
+  intro x _
+  -- x is reachable by h_reach
+  obtain ⟨k, u, hk_pos, hx⟩ := h_reach x
+  -- So x ∈ reachableSetInKSteps a B k
+  have h_in_k : x ∈ reachableSetInKSteps sys k := ⟨u, hx⟩
+  -- Which equals controllabilityColumnSpace a B k (when k > 0)
+  rw [reachable_set_eq_controllability_range sys k hk_pos] at h_in_k
+  -- And that's contained in the supremum
+  exact Submodule.mem_iSup_of_mem k h_in_k
+
+theorem reachability_implies_full_rank
+    [FiniteDimensional ℂ σ]
+    (sys : DiscreteLinearSystemState σ ι) (n : ℕ) (hn : n > 0)
+    (h_dim : Module.finrank ℂ σ = n)
+    (h_reach : sys.IsReachable) :
+    controllabilityColumnSpace sys.a sys.B n = ⊤ :=
+  reachable_implies_controllabilityColumnSpace_eq_top sys n hn h_dim h_reach
+
+
+
+theorem reachability_implies_rank_eq_dim
+    [FiniteDimensional ℂ σ]
+    (sys : DiscreteLinearSystemState σ ι)
+    (h_reach : sys.IsReachable)
+    (hn : Module.finrank ℂ σ > 0) :
+    Module.finrank ℂ (controllabilityColumnSpace sys.a sys.B (Module.finrank ℂ σ)) =
+    Module.finrank ℂ σ := by
+  have h_top := reachability_implies_full_rank sys (Module.finrank ℂ σ) hn rfl h_reach
+  rw [h_top]
+  exact finrank_top ℂ σ
+
+/-- Alternative formulation: The controllability submodule has full rank -/
+theorem reachability_implies_full_finrank
+    [FiniteDimensional ℂ σ]
+    (sys : DiscreteLinearSystemState σ ι) (n : ℕ)
+    (h_dim : Module.finrank ℂ σ = n)
+    (hn : n > 0)
+    (h_reach : sys.IsReachable) :
+    Module.finrank ℂ (controllabilityColumnSpace sys.a sys.B n) = n := by
+  have h_top := reachability_implies_full_rank sys n hn h_dim h_reach
+  rw [h_top]
+  rw [finrank_top]
+  exact h_dim
